@@ -39,7 +39,8 @@
 <span class="sourceLineNo">031</span>public interface JSONMessagePipe {<a name="line.31"></a>
 <span class="sourceLineNo">032</span>        void send(Map&lt;String, Object&gt; msg) throws IOException;<a name="line.32"></a>
 <span class="sourceLineNo">033</span>        Map&lt;String, Object&gt; recv() throws IOException;<a name="line.33"></a>
-<span class="sourceLineNo">034</span>}<a name="line.34"></a>
+<span class="sourceLineNo">034</span>        void close();<a name="line.34"></a>
+<span class="sourceLineNo">035</span>}<a name="line.35"></a>
 
 
 

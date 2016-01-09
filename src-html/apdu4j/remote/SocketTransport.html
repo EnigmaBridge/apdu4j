@@ -31,180 +31,224 @@
 <span class="sourceLineNo">023</span><a name="line.23"></a>
 <span class="sourceLineNo">024</span>import java.io.FileInputStream;<a name="line.24"></a>
 <span class="sourceLineNo">025</span>import java.io.IOException;<a name="line.25"></a>
-<span class="sourceLineNo">026</span>import java.net.ServerSocket;<a name="line.26"></a>
-<span class="sourceLineNo">027</span>import java.net.Socket;<a name="line.27"></a>
-<span class="sourceLineNo">028</span>import java.nio.ByteBuffer;<a name="line.28"></a>
-<span class="sourceLineNo">029</span>import java.nio.ByteOrder;<a name="line.29"></a>
-<span class="sourceLineNo">030</span>import java.nio.charset.Charset;<a name="line.30"></a>
-<span class="sourceLineNo">031</span>import java.security.KeyManagementException;<a name="line.31"></a>
-<span class="sourceLineNo">032</span>import java.security.KeyStore;<a name="line.32"></a>
-<span class="sourceLineNo">033</span>import java.security.KeyStoreException;<a name="line.33"></a>
-<span class="sourceLineNo">034</span>import java.security.NoSuchAlgorithmException;<a name="line.34"></a>
-<span class="sourceLineNo">035</span>import java.security.UnrecoverableKeyException;<a name="line.35"></a>
-<span class="sourceLineNo">036</span>import java.security.cert.CertificateException;<a name="line.36"></a>
-<span class="sourceLineNo">037</span>import java.security.cert.X509Certificate;<a name="line.37"></a>
-<span class="sourceLineNo">038</span>import java.util.Map;<a name="line.38"></a>
-<span class="sourceLineNo">039</span><a name="line.39"></a>
-<span class="sourceLineNo">040</span>import javax.net.ssl.KeyManagerFactory;<a name="line.40"></a>
-<span class="sourceLineNo">041</span>import javax.net.ssl.SSLContext;<a name="line.41"></a>
-<span class="sourceLineNo">042</span>import javax.net.ssl.SSLSocketFactory;<a name="line.42"></a>
-<span class="sourceLineNo">043</span>import javax.net.ssl.TrustManager;<a name="line.43"></a>
-<span class="sourceLineNo">044</span>import javax.net.ssl.TrustManagerFactory;<a name="line.44"></a>
-<span class="sourceLineNo">045</span>import javax.net.ssl.X509TrustManager;<a name="line.45"></a>
-<span class="sourceLineNo">046</span>import javax.xml.bind.DatatypeConverter;<a name="line.46"></a>
+<span class="sourceLineNo">026</span>import java.io.InputStream;<a name="line.26"></a>
+<span class="sourceLineNo">027</span>import java.net.ServerSocket;<a name="line.27"></a>
+<span class="sourceLineNo">028</span>import java.net.Socket;<a name="line.28"></a>
+<span class="sourceLineNo">029</span>import java.nio.ByteBuffer;<a name="line.29"></a>
+<span class="sourceLineNo">030</span>import java.nio.ByteOrder;<a name="line.30"></a>
+<span class="sourceLineNo">031</span>import java.nio.charset.Charset;<a name="line.31"></a>
+<span class="sourceLineNo">032</span>import java.security.KeyManagementException;<a name="line.32"></a>
+<span class="sourceLineNo">033</span>import java.security.KeyStore;<a name="line.33"></a>
+<span class="sourceLineNo">034</span>import java.security.KeyStoreException;<a name="line.34"></a>
+<span class="sourceLineNo">035</span>import java.security.NoSuchAlgorithmException;<a name="line.35"></a>
+<span class="sourceLineNo">036</span>import java.security.UnrecoverableKeyException;<a name="line.36"></a>
+<span class="sourceLineNo">037</span>import java.security.cert.CertificateException;<a name="line.37"></a>
+<span class="sourceLineNo">038</span>import java.security.cert.X509Certificate;<a name="line.38"></a>
+<span class="sourceLineNo">039</span>import java.util.Map;<a name="line.39"></a>
+<span class="sourceLineNo">040</span><a name="line.40"></a>
+<span class="sourceLineNo">041</span>import javax.net.ssl.KeyManagerFactory;<a name="line.41"></a>
+<span class="sourceLineNo">042</span>import javax.net.ssl.SSLContext;<a name="line.42"></a>
+<span class="sourceLineNo">043</span>import javax.net.ssl.SSLSocketFactory;<a name="line.43"></a>
+<span class="sourceLineNo">044</span>import javax.net.ssl.TrustManager;<a name="line.44"></a>
+<span class="sourceLineNo">045</span>import javax.net.ssl.TrustManagerFactory;<a name="line.45"></a>
+<span class="sourceLineNo">046</span>import javax.net.ssl.X509TrustManager;<a name="line.46"></a>
 <span class="sourceLineNo">047</span><a name="line.47"></a>
 <span class="sourceLineNo">048</span>import org.json.simple.JSONObject;<a name="line.48"></a>
 <span class="sourceLineNo">049</span>import org.json.simple.JSONValue;<a name="line.49"></a>
-<span class="sourceLineNo">050</span><a name="line.50"></a>
-<span class="sourceLineNo">051</span>/**<a name="line.51"></a>
-<span class="sourceLineNo">052</span> * Based on the &lt;a href=<a name="line.52"></a>
-<span class="sourceLineNo">053</span> * "https://developer.chrome.com/extensions/nativeMessaging#native-messaging-host-protocol"&gt;<a name="line.53"></a>
-<span class="sourceLineNo">054</span> * NativeMessaging protocol from Chrome&lt;/a&gt; (but uses big endian uint32<a name="line.54"></a>
-<span class="sourceLineNo">055</span> * as is common in network protocols). Messages bigger than 1024 bytes are<a name="line.55"></a>
-<span class="sourceLineNo">056</span> * rejected by this implementation and the underlying socket is closed.<a name="line.56"></a>
-<span class="sourceLineNo">057</span> *<a name="line.57"></a>
-<span class="sourceLineNo">058</span> * @author Martin Paljak<a name="line.58"></a>
-<span class="sourceLineNo">059</span> */<a name="line.59"></a>
-<span class="sourceLineNo">060</span>public class SocketTransport implements JSONMessagePipe, AutoCloseable {<a name="line.60"></a>
-<span class="sourceLineNo">061</span>        private boolean verbose = false;<a name="line.61"></a>
-<span class="sourceLineNo">062</span>        private final Socket socket;<a name="line.62"></a>
-<span class="sourceLineNo">063</span>        private final ByteBuffer length = ByteBuffer.allocate(Integer.SIZE / Byte.SIZE);<a name="line.63"></a>
-<span class="sourceLineNo">064</span><a name="line.64"></a>
-<span class="sourceLineNo">065</span>        public SocketTransport(Socket s) {<a name="line.65"></a>
-<span class="sourceLineNo">066</span>                socket = s;<a name="line.66"></a>
-<span class="sourceLineNo">067</span>                length.order(ByteOrder.BIG_ENDIAN);<a name="line.67"></a>
-<span class="sourceLineNo">068</span>        }<a name="line.68"></a>
+<span class="sourceLineNo">050</span>import org.slf4j.Logger;<a name="line.50"></a>
+<span class="sourceLineNo">051</span>import org.slf4j.LoggerFactory;<a name="line.51"></a>
+<span class="sourceLineNo">052</span><a name="line.52"></a>
+<span class="sourceLineNo">053</span>import apdu4j.HexUtils;<a name="line.53"></a>
+<span class="sourceLineNo">054</span><a name="line.54"></a>
+<span class="sourceLineNo">055</span>/**<a name="line.55"></a>
+<span class="sourceLineNo">056</span> * Based on the &lt;a href=<a name="line.56"></a>
+<span class="sourceLineNo">057</span> * "https://developer.chrome.com/extensions/nativeMessaging#native-messaging-host-protocol"&gt;<a name="line.57"></a>
+<span class="sourceLineNo">058</span> * NativeMessaging protocol from Chrome&lt;/a&gt; (but uses big endian uint32<a name="line.58"></a>
+<span class="sourceLineNo">059</span> * as is common in network protocols). Messages bigger than 1024 bytes are<a name="line.59"></a>
+<span class="sourceLineNo">060</span> * rejected by this implementation and the underlying socket is closed.<a name="line.60"></a>
+<span class="sourceLineNo">061</span> *<a name="line.61"></a>
+<span class="sourceLineNo">062</span> * @author Martin Paljak<a name="line.62"></a>
+<span class="sourceLineNo">063</span> */<a name="line.63"></a>
+<span class="sourceLineNo">064</span>public class SocketTransport implements JSONMessagePipe {<a name="line.64"></a>
+<span class="sourceLineNo">065</span>        private static Logger logger = LoggerFactory.getLogger(SocketTransport.class);<a name="line.65"></a>
+<span class="sourceLineNo">066</span><a name="line.66"></a>
+<span class="sourceLineNo">067</span>        private final Socket socket;<a name="line.67"></a>
+<span class="sourceLineNo">068</span>        private final ByteBuffer length = ByteBuffer.allocate(Integer.SIZE / Byte.SIZE);<a name="line.68"></a>
 <span class="sourceLineNo">069</span><a name="line.69"></a>
-<span class="sourceLineNo">070</span>        /**<a name="line.70"></a>
-<span class="sourceLineNo">071</span>         * Setting this to true makes the class log to System.out all JSON messages<a name="line.71"></a>
-<span class="sourceLineNo">072</span>         *<a name="line.72"></a>
-<span class="sourceLineNo">073</span>         * @param yes true if the class should be verbose<a name="line.73"></a>
-<span class="sourceLineNo">074</span>         */<a name="line.74"></a>
-<span class="sourceLineNo">075</span>        public void beVerbose(boolean yes) {<a name="line.75"></a>
-<span class="sourceLineNo">076</span>                verbose = yes;<a name="line.76"></a>
-<span class="sourceLineNo">077</span>        }<a name="line.77"></a>
-<span class="sourceLineNo">078</span><a name="line.78"></a>
-<span class="sourceLineNo">079</span>        /**<a name="line.79"></a>
-<span class="sourceLineNo">080</span>         * Connects to the mentioned host and port with SSL without checking certificate chain.<a name="line.80"></a>
-<span class="sourceLineNo">081</span>         *<a name="line.81"></a>
-<span class="sourceLineNo">082</span>         * @param host host to connect to<a name="line.82"></a>
-<span class="sourceLineNo">083</span>         * @param port port to use<a name="line.83"></a>
-<span class="sourceLineNo">084</span>         * @return instance of this class<a name="line.84"></a>
-<span class="sourceLineNo">085</span>         * @throws IOException if establishing the connection fails<a name="line.85"></a>
-<span class="sourceLineNo">086</span>         */<a name="line.86"></a>
-<span class="sourceLineNo">087</span>        public static SocketTransport connect_insecure(String host, int port) throws IOException {<a name="line.87"></a>
-<span class="sourceLineNo">088</span>                return connect(host, port, null);<a name="line.88"></a>
-<span class="sourceLineNo">089</span>        }<a name="line.89"></a>
-<span class="sourceLineNo">090</span><a name="line.90"></a>
-<span class="sourceLineNo">091</span>        /**<a name="line.91"></a>
-<span class="sourceLineNo">092</span>         * Connects to the mentioned host and port with SSL and checks the certificate against the pinned version.<a name="line.92"></a>
-<span class="sourceLineNo">093</span>         *<a name="line.93"></a>
-<span class="sourceLineNo">094</span>         * @param host host to connect to<a name="line.94"></a>
-<span class="sourceLineNo">095</span>         * @param port port to use<a name="line.95"></a>
-<span class="sourceLineNo">096</span>         * @param pinnedcert expected certificate of the server<a name="line.96"></a>
-<span class="sourceLineNo">097</span>         * @return instance of this class<a name="line.97"></a>
-<span class="sourceLineNo">098</span>         * @throws IOException if establishing the connection fails<a name="line.98"></a>
-<span class="sourceLineNo">099</span>         */<a name="line.99"></a>
-<span class="sourceLineNo">100</span>        public static SocketTransport connect(String host, int port, X509Certificate pinnedcert) throws IOException {<a name="line.100"></a>
-<span class="sourceLineNo">101</span>                try {<a name="line.101"></a>
-<span class="sourceLineNo">102</span>                        // Create a trust manager that does not validate certificate chains<a name="line.102"></a>
-<span class="sourceLineNo">103</span>                        TrustManager[] trustAllCerts = new TrustManager[] {<a name="line.103"></a>
-<span class="sourceLineNo">104</span>                                        new X509TrustManager() {<a name="line.104"></a>
-<span class="sourceLineNo">105</span>                                                @Override<a name="line.105"></a>
-<span class="sourceLineNo">106</span>                                                public X509Certificate[] getAcceptedIssuers() {<a name="line.106"></a>
-<span class="sourceLineNo">107</span>                                                        return new X509Certificate[0];<a name="line.107"></a>
-<span class="sourceLineNo">108</span>                                                }<a name="line.108"></a>
-<span class="sourceLineNo">109</span>                                                @Override<a name="line.109"></a>
-<span class="sourceLineNo">110</span>                                                public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.110"></a>
-<span class="sourceLineNo">111</span>                                                }<a name="line.111"></a>
-<span class="sourceLineNo">112</span>                                                @Override<a name="line.112"></a>
-<span class="sourceLineNo">113</span>                                                public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.113"></a>
-<span class="sourceLineNo">114</span>                                                }<a name="line.114"></a>
-<span class="sourceLineNo">115</span>                                        }<a name="line.115"></a>
-<span class="sourceLineNo">116</span>                        };<a name="line.116"></a>
-<span class="sourceLineNo">117</span><a name="line.117"></a>
-<span class="sourceLineNo">118</span>                        // Trust managers for SSL context<a name="line.118"></a>
-<span class="sourceLineNo">119</span>                        SSLContext sc = SSLContext.getInstance("TLS");<a name="line.119"></a>
-<span class="sourceLineNo">120</span><a name="line.120"></a>
-<span class="sourceLineNo">121</span>                        if (pinnedcert != null) {<a name="line.121"></a>
-<span class="sourceLineNo">122</span>                                TrustManagerFactory tmf = TrustManagerFactory.getInstance("X509");<a name="line.122"></a>
-<span class="sourceLineNo">123</span>                                KeyStore ks = null;<a name="line.123"></a>
-<span class="sourceLineNo">124</span>                                ks = KeyStore.getInstance(KeyStore.getDefaultType());<a name="line.124"></a>
-<span class="sourceLineNo">125</span>                                // Generate an empty one<a name="line.125"></a>
-<span class="sourceLineNo">126</span>                                ks.load(null, null);<a name="line.126"></a>
-<span class="sourceLineNo">127</span>                                ks.setCertificateEntry("pinned", pinnedcert);<a name="line.127"></a>
-<span class="sourceLineNo">128</span>                                tmf.init(ks);<a name="line.128"></a>
-<span class="sourceLineNo">129</span>                                sc.init(null, tmf.getTrustManagers(), new java.security.SecureRandom());<a name="line.129"></a>
-<span class="sourceLineNo">130</span>                        } else {<a name="line.130"></a>
-<span class="sourceLineNo">131</span>                                sc.init(null, trustAllCerts, new java.security.SecureRandom());<a name="line.131"></a>
-<span class="sourceLineNo">132</span>                        }<a name="line.132"></a>
-<span class="sourceLineNo">133</span><a name="line.133"></a>
-<span class="sourceLineNo">134</span>                        // Connect with created parameters<a name="line.134"></a>
-<span class="sourceLineNo">135</span>                        SSLSocketFactory factory = sc.getSocketFactory();<a name="line.135"></a>
-<span class="sourceLineNo">136</span>                        Socket s = factory.createSocket(host, port);<a name="line.136"></a>
-<span class="sourceLineNo">137</span>                        return new SocketTransport(s);<a name="line.137"></a>
-<span class="sourceLineNo">138</span>                } catch (KeyManagementException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {<a name="line.138"></a>
-<span class="sourceLineNo">139</span>                        throw new IOException("Could not connect", e);<a name="line.139"></a>
-<span class="sourceLineNo">140</span>                }<a name="line.140"></a>
-<span class="sourceLineNo">141</span>        }<a name="line.141"></a>
-<span class="sourceLineNo">142</span><a name="line.142"></a>
-<span class="sourceLineNo">143</span>        // Helper class to make a SSL server<a name="line.143"></a>
-<span class="sourceLineNo">144</span>        public static ServerSocket make_server(int port, String pkcs12Path, String pkcs12Pass)<a name="line.144"></a>
-<span class="sourceLineNo">145</span>                        throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException, KeyManagementException {<a name="line.145"></a>
-<span class="sourceLineNo">146</span>                KeyStore ks = KeyStore.getInstance("PKCS12");<a name="line.146"></a>
-<span class="sourceLineNo">147</span>                ks.load(new FileInputStream(pkcs12Path), pkcs12Pass.toCharArray());<a name="line.147"></a>
-<span class="sourceLineNo">148</span>                KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());<a name="line.148"></a>
-<span class="sourceLineNo">149</span>                kmf.init(ks, pkcs12Pass.toCharArray());<a name="line.149"></a>
-<span class="sourceLineNo">150</span>                SSLContext sc = SSLContext.getInstance("TLS");<a name="line.150"></a>
-<span class="sourceLineNo">151</span>                sc.init(kmf.getKeyManagers(), null, null);<a name="line.151"></a>
-<span class="sourceLineNo">152</span>                return sc.getServerSocketFactory().createServerSocket(port);<a name="line.152"></a>
-<span class="sourceLineNo">153</span>        }<a name="line.153"></a>
-<span class="sourceLineNo">154</span><a name="line.154"></a>
+<span class="sourceLineNo">070</span>        public SocketTransport(Socket s) {<a name="line.70"></a>
+<span class="sourceLineNo">071</span>                socket = s;<a name="line.71"></a>
+<span class="sourceLineNo">072</span>                length.order(ByteOrder.BIG_ENDIAN);<a name="line.72"></a>
+<span class="sourceLineNo">073</span>        }<a name="line.73"></a>
+<span class="sourceLineNo">074</span><a name="line.74"></a>
+<span class="sourceLineNo">075</span><a name="line.75"></a>
+<span class="sourceLineNo">076</span>        /**<a name="line.76"></a>
+<span class="sourceLineNo">077</span>         * Connects to the mentioned host and port with SSL without checking certificate chain.<a name="line.77"></a>
+<span class="sourceLineNo">078</span>         *<a name="line.78"></a>
+<span class="sourceLineNo">079</span>         * @param host host to connect to<a name="line.79"></a>
+<span class="sourceLineNo">080</span>         * @param port port to use<a name="line.80"></a>
+<span class="sourceLineNo">081</span>         * @return instance of this class<a name="line.81"></a>
+<span class="sourceLineNo">082</span>         * @throws IOException if establishing the connection fails<a name="line.82"></a>
+<span class="sourceLineNo">083</span>         */<a name="line.83"></a>
+<span class="sourceLineNo">084</span>        public static SocketTransport connect_insecure(String host, int port) throws IOException {<a name="line.84"></a>
+<span class="sourceLineNo">085</span>                return connect(host, port, null);<a name="line.85"></a>
+<span class="sourceLineNo">086</span>        }<a name="line.86"></a>
+<span class="sourceLineNo">087</span><a name="line.87"></a>
+<span class="sourceLineNo">088</span>        // Returns a SSLSocketFactory that either does no checking or checks for a pinnned certificate<a name="line.88"></a>
+<span class="sourceLineNo">089</span>        protected static SSLSocketFactory get_ssl_socket_factory(X509Certificate pinnedcert) throws IOException {<a name="line.89"></a>
+<span class="sourceLineNo">090</span>                try {<a name="line.90"></a>
+<span class="sourceLineNo">091</span>                        // Create a trust manager that does not validate certificate chains<a name="line.91"></a>
+<span class="sourceLineNo">092</span>                        TrustManager[] trustAllCerts = new TrustManager[] {<a name="line.92"></a>
+<span class="sourceLineNo">093</span>                                        new X509TrustManager() {<a name="line.93"></a>
+<span class="sourceLineNo">094</span>                                                @Override<a name="line.94"></a>
+<span class="sourceLineNo">095</span>                                                public X509Certificate[] getAcceptedIssuers() {<a name="line.95"></a>
+<span class="sourceLineNo">096</span>                                                        return new X509Certificate[0];<a name="line.96"></a>
+<span class="sourceLineNo">097</span>                                                }<a name="line.97"></a>
+<span class="sourceLineNo">098</span>                                                @Override<a name="line.98"></a>
+<span class="sourceLineNo">099</span>                                                public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.99"></a>
+<span class="sourceLineNo">100</span>                                                }<a name="line.100"></a>
+<span class="sourceLineNo">101</span>                                                @Override<a name="line.101"></a>
+<span class="sourceLineNo">102</span>                                                public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.102"></a>
+<span class="sourceLineNo">103</span>                                                }<a name="line.103"></a>
+<span class="sourceLineNo">104</span>                                        }<a name="line.104"></a>
+<span class="sourceLineNo">105</span>                        };<a name="line.105"></a>
+<span class="sourceLineNo">106</span><a name="line.106"></a>
+<span class="sourceLineNo">107</span>                        // Trust managers for SSL context<a name="line.107"></a>
+<span class="sourceLineNo">108</span>                        SSLContext sc = SSLContext.getInstance("TLS");<a name="line.108"></a>
+<span class="sourceLineNo">109</span><a name="line.109"></a>
+<span class="sourceLineNo">110</span>                        if (pinnedcert != null) {<a name="line.110"></a>
+<span class="sourceLineNo">111</span>                                TrustManagerFactory tmf = TrustManagerFactory.getInstance("X509");<a name="line.111"></a>
+<span class="sourceLineNo">112</span>                                KeyStore ks = null;<a name="line.112"></a>
+<span class="sourceLineNo">113</span>                                ks = KeyStore.getInstance(KeyStore.getDefaultType());<a name="line.113"></a>
+<span class="sourceLineNo">114</span>                                // Generate an empty one<a name="line.114"></a>
+<span class="sourceLineNo">115</span>                                ks.load(null, null);<a name="line.115"></a>
+<span class="sourceLineNo">116</span>                                ks.setCertificateEntry("pinned", pinnedcert);<a name="line.116"></a>
+<span class="sourceLineNo">117</span>                                tmf.init(ks);<a name="line.117"></a>
+<span class="sourceLineNo">118</span>                                sc.init(null, tmf.getTrustManagers(), new java.security.SecureRandom());<a name="line.118"></a>
+<span class="sourceLineNo">119</span>                        } else {<a name="line.119"></a>
+<span class="sourceLineNo">120</span>                                sc.init(null, trustAllCerts, new java.security.SecureRandom());<a name="line.120"></a>
+<span class="sourceLineNo">121</span>                        }<a name="line.121"></a>
+<span class="sourceLineNo">122</span>                        // Connect with created parameters<a name="line.122"></a>
+<span class="sourceLineNo">123</span>                        return sc.getSocketFactory();<a name="line.123"></a>
+<span class="sourceLineNo">124</span>                } catch (KeyManagementException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {<a name="line.124"></a>
+<span class="sourceLineNo">125</span>                        throw new IOException("Could not connect", e);<a name="line.125"></a>
+<span class="sourceLineNo">126</span>                }<a name="line.126"></a>
+<span class="sourceLineNo">127</span>        }<a name="line.127"></a>
+<span class="sourceLineNo">128</span><a name="line.128"></a>
+<span class="sourceLineNo">129</span>        /**<a name="line.129"></a>
+<span class="sourceLineNo">130</span>         * Connects to the mentioned host and port with SSL and checks the certificate against the pinned version.<a name="line.130"></a>
+<span class="sourceLineNo">131</span>         *<a name="line.131"></a>
+<span class="sourceLineNo">132</span>         * @param host host to connect to<a name="line.132"></a>
+<span class="sourceLineNo">133</span>         * @param port port to use<a name="line.133"></a>
+<span class="sourceLineNo">134</span>         * @param pinnedcert expected certificate of the server<a name="line.134"></a>
+<span class="sourceLineNo">135</span>         * @return instance of this class<a name="line.135"></a>
+<span class="sourceLineNo">136</span>         * @throws IOException if establishing the connection fails<a name="line.136"></a>
+<span class="sourceLineNo">137</span>         */<a name="line.137"></a>
+<span class="sourceLineNo">138</span>        public static SocketTransport connect(String host, int port, X509Certificate pinnedcert) throws IOException {<a name="line.138"></a>
+<span class="sourceLineNo">139</span>                try {<a name="line.139"></a>
+<span class="sourceLineNo">140</span>                        // Create a trust manager that does not validate certificate chains<a name="line.140"></a>
+<span class="sourceLineNo">141</span>                        TrustManager[] trustAllCerts = new TrustManager[] {<a name="line.141"></a>
+<span class="sourceLineNo">142</span>                                        new X509TrustManager() {<a name="line.142"></a>
+<span class="sourceLineNo">143</span>                                                @Override<a name="line.143"></a>
+<span class="sourceLineNo">144</span>                                                public X509Certificate[] getAcceptedIssuers() {<a name="line.144"></a>
+<span class="sourceLineNo">145</span>                                                        return new X509Certificate[0];<a name="line.145"></a>
+<span class="sourceLineNo">146</span>                                                }<a name="line.146"></a>
+<span class="sourceLineNo">147</span>                                                @Override<a name="line.147"></a>
+<span class="sourceLineNo">148</span>                                                public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.148"></a>
+<span class="sourceLineNo">149</span>                                                }<a name="line.149"></a>
+<span class="sourceLineNo">150</span>                                                @Override<a name="line.150"></a>
+<span class="sourceLineNo">151</span>                                                public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {<a name="line.151"></a>
+<span class="sourceLineNo">152</span>                                                }<a name="line.152"></a>
+<span class="sourceLineNo">153</span>                                        }<a name="line.153"></a>
+<span class="sourceLineNo">154</span>                        };<a name="line.154"></a>
 <span class="sourceLineNo">155</span><a name="line.155"></a>
-<span class="sourceLineNo">156</span>        @Override<a name="line.156"></a>
-<span class="sourceLineNo">157</span>        public synchronized void send(Map&lt;String, Object&gt; msg) throws IOException {<a name="line.157"></a>
-<span class="sourceLineNo">158</span>                JSONObject obj = new JSONObject();<a name="line.158"></a>
-<span class="sourceLineNo">159</span>                obj.putAll(msg);<a name="line.159"></a>
-<span class="sourceLineNo">160</span>                byte[] data = obj.toJSONString().getBytes(Charset.forName("UTF-8"));<a name="line.160"></a>
-<span class="sourceLineNo">161</span>                socket.getOutputStream().write(length.putInt(0, data.length).array());<a name="line.161"></a>
-<span class="sourceLineNo">162</span>                socket.getOutputStream().write(data);<a name="line.162"></a>
-<span class="sourceLineNo">163</span>                if (verbose) {<a name="line.163"></a>
-<span class="sourceLineNo">164</span>                        System.out.println("&gt; (" + DatatypeConverter.printHexBinary(length.array()) + ") " + new String(data, "UTF-8"));<a name="line.164"></a>
-<span class="sourceLineNo">165</span>                }<a name="line.165"></a>
-<span class="sourceLineNo">166</span>        }<a name="line.166"></a>
-<span class="sourceLineNo">167</span><a name="line.167"></a>
-<span class="sourceLineNo">168</span>        @Override<a name="line.168"></a>
-<span class="sourceLineNo">169</span>        public synchronized Map&lt;String, Object&gt; recv() throws IOException {<a name="line.169"></a>
-<span class="sourceLineNo">170</span>                if (socket.isClosed()) {<a name="line.170"></a>
-<span class="sourceLineNo">171</span>                        throw new IOException("Connection closed");<a name="line.171"></a>
-<span class="sourceLineNo">172</span>                }<a name="line.172"></a>
-<span class="sourceLineNo">173</span>                length.putInt(0, 0);<a name="line.173"></a>
-<span class="sourceLineNo">174</span>                socket.getInputStream().read(length.array());<a name="line.174"></a>
-<span class="sourceLineNo">175</span>                int len = length.getInt(0);<a name="line.175"></a>
-<span class="sourceLineNo">176</span>                if (len == 0) {<a name="line.176"></a>
-<span class="sourceLineNo">177</span>                        throw new IOException("Failed to read data (length)");<a name="line.177"></a>
+<span class="sourceLineNo">156</span>                        // Trust managers for SSL context<a name="line.156"></a>
+<span class="sourceLineNo">157</span>                        SSLContext sc = SSLContext.getInstance("TLS");<a name="line.157"></a>
+<span class="sourceLineNo">158</span><a name="line.158"></a>
+<span class="sourceLineNo">159</span>                        if (pinnedcert != null) {<a name="line.159"></a>
+<span class="sourceLineNo">160</span>                                TrustManagerFactory tmf = TrustManagerFactory.getInstance("X509");<a name="line.160"></a>
+<span class="sourceLineNo">161</span>                                KeyStore ks = null;<a name="line.161"></a>
+<span class="sourceLineNo">162</span>                                ks = KeyStore.getInstance(KeyStore.getDefaultType());<a name="line.162"></a>
+<span class="sourceLineNo">163</span>                                // Generate an empty one<a name="line.163"></a>
+<span class="sourceLineNo">164</span>                                ks.load(null, null);<a name="line.164"></a>
+<span class="sourceLineNo">165</span>                                ks.setCertificateEntry("pinned", pinnedcert);<a name="line.165"></a>
+<span class="sourceLineNo">166</span>                                tmf.init(ks);<a name="line.166"></a>
+<span class="sourceLineNo">167</span>                                sc.init(null, tmf.getTrustManagers(), new java.security.SecureRandom());<a name="line.167"></a>
+<span class="sourceLineNo">168</span>                        } else {<a name="line.168"></a>
+<span class="sourceLineNo">169</span>                                sc.init(null, trustAllCerts, new java.security.SecureRandom());<a name="line.169"></a>
+<span class="sourceLineNo">170</span>                        }<a name="line.170"></a>
+<span class="sourceLineNo">171</span><a name="line.171"></a>
+<span class="sourceLineNo">172</span>                        // Connect with created parameters<a name="line.172"></a>
+<span class="sourceLineNo">173</span>                        SSLSocketFactory factory = sc.getSocketFactory();<a name="line.173"></a>
+<span class="sourceLineNo">174</span>                        Socket s = factory.createSocket(host, port);<a name="line.174"></a>
+<span class="sourceLineNo">175</span>                        return new SocketTransport(s);<a name="line.175"></a>
+<span class="sourceLineNo">176</span>                } catch (KeyManagementException | KeyStoreException | NoSuchAlgorithmException | CertificateException e) {<a name="line.176"></a>
+<span class="sourceLineNo">177</span>                        throw new IOException("Could not connect", e);<a name="line.177"></a>
 <span class="sourceLineNo">178</span>                }<a name="line.178"></a>
-<span class="sourceLineNo">179</span>                if (len &gt; 1024) {<a name="line.179"></a>
-<span class="sourceLineNo">180</span>                        throw new IOException("Bad message length &gt; 1024");<a name="line.180"></a>
-<span class="sourceLineNo">181</span>                }<a name="line.181"></a>
-<span class="sourceLineNo">182</span>                // Read data<a name="line.182"></a>
-<span class="sourceLineNo">183</span>                byte[] data = new byte[len];<a name="line.183"></a>
-<span class="sourceLineNo">184</span><a name="line.184"></a>
-<span class="sourceLineNo">185</span>                socket.getInputStream().read(data);<a name="line.185"></a>
-<span class="sourceLineNo">186</span>                if (verbose) {<a name="line.186"></a>
-<span class="sourceLineNo">187</span>                        System.out.println("&lt; (" + DatatypeConverter.printHexBinary(length.array()) + ") " + new String(data, "UTF-8"));<a name="line.187"></a>
-<span class="sourceLineNo">188</span>                }<a name="line.188"></a>
-<span class="sourceLineNo">189</span>                JSONObject obj = (JSONObject) JSONValue.parse(new String(data, "UTF-8"));<a name="line.189"></a>
-<span class="sourceLineNo">190</span>                return obj;<a name="line.190"></a>
-<span class="sourceLineNo">191</span>        }<a name="line.191"></a>
-<span class="sourceLineNo">192</span><a name="line.192"></a>
-<span class="sourceLineNo">193</span>        @Override<a name="line.193"></a>
-<span class="sourceLineNo">194</span>        public void close() {<a name="line.194"></a>
-<span class="sourceLineNo">195</span>                try {<a name="line.195"></a>
-<span class="sourceLineNo">196</span>                        socket.close();<a name="line.196"></a>
-<span class="sourceLineNo">197</span>                } catch (IOException e) {}<a name="line.197"></a>
-<span class="sourceLineNo">198</span>        }<a name="line.198"></a>
-<span class="sourceLineNo">199</span>}<a name="line.199"></a>
+<span class="sourceLineNo">179</span>        }<a name="line.179"></a>
+<span class="sourceLineNo">180</span><a name="line.180"></a>
+<span class="sourceLineNo">181</span>        // Helper class to make a SSL server<a name="line.181"></a>
+<span class="sourceLineNo">182</span>        public static ServerSocket make_server(int port, String pkcs12Path, String pkcs12Pass)<a name="line.182"></a>
+<span class="sourceLineNo">183</span>                        throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException, KeyManagementException {<a name="line.183"></a>
+<span class="sourceLineNo">184</span>                return make_server(port, new FileInputStream(pkcs12Path), pkcs12Pass);<a name="line.184"></a>
+<span class="sourceLineNo">185</span>        }<a name="line.185"></a>
+<span class="sourceLineNo">186</span><a name="line.186"></a>
+<span class="sourceLineNo">187</span>        // Helper class to make a SSL server<a name="line.187"></a>
+<span class="sourceLineNo">188</span>        protected static ServerSocket make_server(int port, InputStream pkcs12stream, String pkcs12Pass)<a name="line.188"></a>
+<span class="sourceLineNo">189</span>                        throws IOException, KeyStoreException, NoSuchAlgorithmException, CertificateException, UnrecoverableKeyException, KeyManagementException {<a name="line.189"></a>
+<span class="sourceLineNo">190</span>                KeyStore ks = KeyStore.getInstance("PKCS12");<a name="line.190"></a>
+<span class="sourceLineNo">191</span>                ks.load(pkcs12stream, pkcs12Pass.toCharArray());<a name="line.191"></a>
+<span class="sourceLineNo">192</span>                KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());<a name="line.192"></a>
+<span class="sourceLineNo">193</span>                kmf.init(ks, pkcs12Pass.toCharArray());<a name="line.193"></a>
+<span class="sourceLineNo">194</span>                SSLContext sc = SSLContext.getInstance("TLS");<a name="line.194"></a>
+<span class="sourceLineNo">195</span>                sc.init(kmf.getKeyManagers(), null, null);<a name="line.195"></a>
+<span class="sourceLineNo">196</span>                return sc.getServerSocketFactory().createServerSocket(port);<a name="line.196"></a>
+<span class="sourceLineNo">197</span>        }<a name="line.197"></a>
+<span class="sourceLineNo">198</span><a name="line.198"></a>
+<span class="sourceLineNo">199</span><a name="line.199"></a>
+<span class="sourceLineNo">200</span>        @Override<a name="line.200"></a>
+<span class="sourceLineNo">201</span>        @SuppressWarnings("unchecked")<a name="line.201"></a>
+<span class="sourceLineNo">202</span>        public synchronized void send(Map&lt;String, Object&gt; msg) throws IOException {<a name="line.202"></a>
+<span class="sourceLineNo">203</span>                JSONObject obj = new JSONObject();<a name="line.203"></a>
+<span class="sourceLineNo">204</span>                obj.putAll(msg);<a name="line.204"></a>
+<span class="sourceLineNo">205</span>                byte[] data = obj.toJSONString().getBytes(Charset.forName("UTF-8"));<a name="line.205"></a>
+<span class="sourceLineNo">206</span>                socket.getOutputStream().write(length.putInt(0, data.length).array());<a name="line.206"></a>
+<span class="sourceLineNo">207</span>                socket.getOutputStream().write(data);<a name="line.207"></a>
+<span class="sourceLineNo">208</span>                logger.debug("&gt; ({}) {}", HexUtils.encodeHexString(length.array()), obj.toJSONString());<a name="line.208"></a>
+<span class="sourceLineNo">209</span>        }<a name="line.209"></a>
+<span class="sourceLineNo">210</span><a name="line.210"></a>
+<span class="sourceLineNo">211</span>        @Override<a name="line.211"></a>
+<span class="sourceLineNo">212</span>        @SuppressWarnings("unchecked")<a name="line.212"></a>
+<span class="sourceLineNo">213</span>        public synchronized Map&lt;String, Object&gt; recv() throws IOException {<a name="line.213"></a>
+<span class="sourceLineNo">214</span>                if (socket.isClosed()) {<a name="line.214"></a>
+<span class="sourceLineNo">215</span>                        throw new IOException("Connection closed");<a name="line.215"></a>
+<span class="sourceLineNo">216</span>                }<a name="line.216"></a>
+<span class="sourceLineNo">217</span>                length.putInt(0, 0);<a name="line.217"></a>
+<span class="sourceLineNo">218</span>                socket.getInputStream().read(length.array());<a name="line.218"></a>
+<span class="sourceLineNo">219</span>                int len = length.getInt(0);<a name="line.219"></a>
+<span class="sourceLineNo">220</span>                if (len == 0) {<a name="line.220"></a>
+<span class="sourceLineNo">221</span>                        throw new IOException("Failed to read data (length)");<a name="line.221"></a>
+<span class="sourceLineNo">222</span>                }<a name="line.222"></a>
+<span class="sourceLineNo">223</span>                if (len &gt; 1024) {<a name="line.223"></a>
+<span class="sourceLineNo">224</span>                        throw new IOException("Bad message length &gt; 1024");<a name="line.224"></a>
+<span class="sourceLineNo">225</span>                }<a name="line.225"></a>
+<span class="sourceLineNo">226</span>                // Read data<a name="line.226"></a>
+<span class="sourceLineNo">227</span>                byte[] data = new byte[len];<a name="line.227"></a>
+<span class="sourceLineNo">228</span><a name="line.228"></a>
+<span class="sourceLineNo">229</span>                socket.getInputStream().read(data);<a name="line.229"></a>
+<span class="sourceLineNo">230</span>                JSONObject obj = (JSONObject) JSONValue.parse(new String(data, "UTF-8"));<a name="line.230"></a>
+<span class="sourceLineNo">231</span>                logger.debug("&lt; ({}) {}",  HexUtils.encodeHexString(length.array()), obj.toJSONString());<a name="line.231"></a>
+<span class="sourceLineNo">232</span>                return obj;<a name="line.232"></a>
+<span class="sourceLineNo">233</span>        }<a name="line.233"></a>
+<span class="sourceLineNo">234</span><a name="line.234"></a>
+<span class="sourceLineNo">235</span>        @Override<a name="line.235"></a>
+<span class="sourceLineNo">236</span>        public void close() {<a name="line.236"></a>
+<span class="sourceLineNo">237</span>                try {<a name="line.237"></a>
+<span class="sourceLineNo">238</span>                        socket.close();<a name="line.238"></a>
+<span class="sourceLineNo">239</span>                } catch (IOException e) {<a name="line.239"></a>
+<span class="sourceLineNo">240</span>                        logger.trace("Could not close socket", e);<a name="line.240"></a>
+<span class="sourceLineNo">241</span>                }<a name="line.241"></a>
+<span class="sourceLineNo">242</span>        }<a name="line.242"></a>
+<span class="sourceLineNo">243</span>}<a name="line.243"></a>
 
 
 
